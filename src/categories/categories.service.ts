@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -26,20 +26,65 @@ export class CategoriesService {
     }
   }
 
-  findAll() {
-    return `This action returns all categories`;
+  async findAll() {
+    try {
+      const categories = await this.categoryRepository.find({
+        
+        order: {createAt: 'DESC'}
+      })
+      if (!categories) {
+        throw new NotFoundException()
+      }
+      return categories as Category[]
+    } catch (error) {
+      this.handleExecption(error) 
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} category`;
+  async findOne(id: string) {
+    try {
+      const category = await this.categoryRepository.findOne({
+        where: { id : id}
+      })
+      if(!category) throw new NotFoundException()
+      return category as Category
+    } catch (error) {
+      this.handleExecption(error)
+    }
   }
 
-  update(id: number, updateCategoryDto: UpdateCategoryDto) {
-    return `This action updates a #${id} category`;
+  async update(id: string, updateCategoryDto: UpdateCategoryDto) {
+    try {
+      const category = await this.categoryRepository.findOne({
+        where : {id }
+      })
+
+      if(!category) throw new NotFoundException()
+      
+      Object.assign(category,updateCategoryDto)
+      const updateCategory = await this.categoryRepository.save(category);
+
+      return updateCategory as Category;
+
+    } catch (error) {
+      this.handleExecption(error)
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} category`;
+  async remove(id: string) {
+    try {
+      const category =await this.categoryRepository.findOne({
+        where : { id: id}
+      })
+      if (!category) {
+        throw new NotFoundException()
+      }
+      const categoryRemove = await this.categoryRepository.remove(category)
+
+      return { message : `Category delete ${categoryRemove.name}`};
+    } catch (error) {
+      this.handleExecption(error)
+    }
   }
 
   private handleExecption(error:any):never{
@@ -47,6 +92,9 @@ export class CategoriesService {
     
     if (error.code === '23505') {
       throw new BadRequestException('Project already exists');
+    }
+    if (error instanceof NotFoundException) {
+      throw new NotFoundException()
     }
     throw new InternalServerErrorException('An unexpected error occurred');
   }
